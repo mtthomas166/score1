@@ -3,17 +3,16 @@ const Match = require("../models/matchModel");
 const Team = require("../models/teamModel");
 const League = require("../models/leagueModel");
 
-// leagues to sync - you can add more
 const LEAGUES_TO_SYNC = [
   { espn: "eng.1", name: "Premier League", country: "England" },
   { espn: "esp.1", name: "La Liga", country: "Spain" },
   { espn: "ita.1", name: "Serie A", country: "Italy" },
   { espn: "ger.1", name: "Bundesliga", country: "Germany" },
   { espn: "fra.1", name: "Ligue 1", country: "France" },
-  { espn: "egy.1", name: "Egyptian Premier League", country: "Egypt" },
+  { espn: "uefa.champions", name: "Champions League", country: "Europe" },
 ];
 
-async function findOrCreateLeague(espnLeagueData, fallback) {
+async function findOrCreateLeague(fallback) {
   try {
     let league = await League.findOne({ name: fallback.name });
     if (!league) {
@@ -21,7 +20,7 @@ async function findOrCreateLeague(espnLeagueData, fallback) {
         name: fallback.name,
         country: fallback.country,
         logo: `https://a3.espncdn.com/combiner/i?img=%2Fi%2Fleaguelogos%2Fsoccer%2F500%2F${fallback.espn.split(".")[0]}.png`,
-        apiId: Math.floor(Math.random() * 1000000), // temporary if your league needs apiId
+        apiId: Math.floor(Math.random() * 1000000),
       });
     }
     return league;
@@ -33,13 +32,8 @@ async function findOrCreateLeague(espnLeagueData, fallback) {
 
 async function findOrCreateTeam(competitor) {
   try {
-    const name = competitor.team.displayName || competitor.team.name;
+    const name = competitor.team.displayName || competitor.team.name || competitor.team.shortDisplayName;
     let team = await Team.findOne({ name });
-    if (!team) {
-      // try to find by apiId if you have it
-      const apiId = parseInt(competitor.id) || Math.floor(Math.random() * 1000000);
-      team = await Team.findOne({ apiId }).catch(() => null);
-    }
     if (!team) {
       team = await Team.create({
         name: name,
@@ -49,15 +43,15 @@ async function findOrCreateTeam(competitor) {
     }
     return team;
   } catch (e) {
-    console.log("team error", e.message, e);
+    console.log("team error", e.message);
     return null;
   }
 }
 
 function mapStatus(espnStatus) {
-  const s = espnStatus?.toLowerCase() || "";
+  const s = (espnStatus || "").toLowerCase();
   if (s.includes("final") || s.includes("ft")) return "finished";
-  if (s.includes("in progress") || s.includes("live") || s.includes("1h") || s.includes("2h") || s.includes("half")) return "live";
+  if (s.includes("in progress") || s.includes("live") || s.includes("half") || s.includes("1h") || s.includes("2h")) return "live";
   if (s.includes("postponed")) return "postponed";
   if (s.includes("cancel")) return "cancelled";
   return "scheduled";
@@ -65,14 +59,28 @@ function mapStatus(espnStatus) {
 
 async function syncOneLeague(leagueConfig) {
   try {
-    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueConfig.espn}/scoreboard`;
-    const { data } = await axios.get(url, { timeout: 10000 });
+    // نجيب ماتشات 3 ايام عشان لو اليوم فاضي
+    const today = new Date();
+    const dates = [];
+    for (let i = -2; i <= 2; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      dates.push(d.toISOString().slice(0,10).replace(/-/g,''));
+    }
+    const dateParam = dates.join('-');
+    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueConfig.espn}/scoreboard?dates=${dateParam}`;
+    
+    const { data } = await axios.get(url, { 
+      timeout: 15000,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    
     if (!data.events || data.events.length === 0) {
-      console.log(`No events for ${leagueConfig.name}`);
+      console.log(`No events for ${leagueConfig.name} on ${dateParam}`);
       return 0;
     }
 
-    const leagueDoc = await findOrCreateLeague(data.leagues?.[0], leagueConfig);
+    const leagueDoc = await findOrCreateLeague(leagueConfig);
     if (!leagueDoc) return 0;
 
     let count = 0;
@@ -95,7 +103,7 @@ async function syncOneLeague(leagueConfig) {
         const status = mapStatus(comp.status?.type?.description || event.status?.type?.description);
         const homeScore = parseInt(homeComp.score) || 0;
         const awayScore = parseInt(awayComp.score) || 0;
-        const minute = comp.status?.displayClock ? parseInt(comp.status.displayClock) || 0 : 0;
+        const minute = comp.status?.displayClock || "";
 
         await Match.findOneAndUpdate(
           { apiId },
@@ -121,7 +129,7 @@ async function syncOneLeague(leagueConfig) {
     console.log(`Synced ${count} matches for ${leagueConfig.name}`);
     return count;
   } catch (err) {
-    console.error(`Failed ${leagueConfig.name}:`, err.message);
+    console.error(`Failed ${leagueConfig.name}:`, err.message, err.response?.status);
     return 0;
   }
 }
@@ -131,15 +139,10 @@ async function syncAllLeagues() {
   for (const lg of LEAGUES_TO_SYNC) {
     const c = await syncOneLeague(lg);
     total += c;
-    // small delay to avoid rate limit
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 800));
   }
+  console.log(`TOTAL SYNCED: ${total}`);
   return total;
-}
-
-// If required directly, run once
-if (require.main === module) {
-  syncAllLeagues().then(t => console.log("Done", t));
 }
 
 module.exports = { syncAllLeagues, syncOneLeague };

@@ -12,7 +12,7 @@ async function connectDB() {
       socketTimeoutMS: 45000,
     });
     isConnected = conn.connections[0].readyState === 1;
-    console.log('MongoDB Connected:', conn.connection.host);
+    console.log('MongoDB Connected:', conn.connection.host); 
   } catch (err) {
     console.error('MongoDB connection error:', err.message);
     throw err;

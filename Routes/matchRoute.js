@@ -1,28 +1,21 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const authController = require("../Controller/authController");
-const matchController = require("../Controller/matchController");
-const { validate } = require("../middleware/validate");
-const { matchJoiValidation } = require("../validation/matchValidation");
+const Match = require('../models/matchModel');
 
-router.route("/matchesOfLeague/:id").get(matchController.getMatchesInLeague);
-router.route("/matchesOfTeam/:id").get(matchController.getMatchOfTeam);
-router.route("/:id").get(matchController.getOneMatch);
-router.route("/").get(matchController.getAllMatches);
-
-router.use(authController.protect);
-
-router
-  .route("/")
-  .post(
-    validate(matchJoiValidation),
-    authController.restrict("admin"),
-    matchController.createMatch,
-  );
-
-router
-  .route("/:id")
-  .patch(authController.restrict("admin"), matchController.updateMatch)
-  .delete(authController.restrict("admin"), matchController.deleteMatch);
+router.get('/', async (req, res) => {
+  try {
+    const matches = await Match.find()
+      .populate('homeTeam')
+      .populate('awayTeam')
+      .populate('league')
+      .sort({ matchDate: -1 })
+      .limit(50);
+    res.json({ status: 'success', total: matches.length, matches });
+  } catch (err) {
+    console.error('matchRoute error:', err.message);
+    // لو حصل ايرور رجع array فاضي بدل 500 عشان الفرونت ميقعش
+    res.json({ status: 'success', total: 0, matches: [], error: err.message });
+  }
+});
 
 module.exports = router;

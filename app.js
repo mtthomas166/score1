@@ -1,77 +1,65 @@
+
 const express = require("express");
+const cors = require("cors");
+const dotenv = require("dotenv");
+const authRoute = require("./Routes/authRoute");
+const teamRoute = require("./Routes/teamRoute");
+const leagueRoute = require("./Routes/leagueRoute");
+const matchRoute = require("./Routes/matchRoute");
+const detailsRoute = require("./Routes/detailsRoute");
+const standingRoute = require("./Routes/standingRoute");
+const eventRoute = require("./Routes/eventRoute");
+const newsRoute = require("./Routes/newsRoute");
+const syncRoute = require("./Routes/syncRoute");
+const globalErrorHandler = require("./Controllers/errorController");
+const AppError = require("./Utils/appError");
+
+dotenv.config({ path: "./config.env" });
 const app = express();
 
-const appError = require("./utils/appError");
-const morgan = require("morgan");
-const helmet = require("helmet");
-const cookieParser = require("cookie-parser");
-const hpp = require("hpp");
-const rateLimiter = require("express-rate-limit");
-const cors = require("cors");
-
+// CORS FIX - allow all origins
 app.use(cors({
   origin: "*",
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-app.use(morgan("dev"));
-app.use(helmet());
-app.use(cookieParser());
-app.use(hpp());
+app.use(express.json());
 
-const limiter = rateLimiter({
-  max: 100,
-  windowMs: 1000 * 60 * 60,
-  message: "too many request from this ip,please try again in an hour",
-});
-
-const authRoute = require("./Routes/authRoute");
-const userRoute = require("./Routes/userRoute");
-const leagueRoute = require("./Routes/leagueRoute");
-const teamRoute = require("./Routes/teamRoute");
-const NewsRoute = require("./Routes/NewsRoute");
-const playerRoute = require("./Routes/playerRoute");
-const coachRoute = require("./Routes/coachRoute");
-const transferRoute = require("./Routes/transferRoute");
-const stadiumRoute = require("./Routes/stadiumRoute");
-const channelRoute = require("./Routes/channelRoute");
-const refereeRoute = require("./Routes/refereeRoute");
-const standingRoute = require("./Routes/standingRoute");
-const topScoresRoute = require("./Routes/topScoresRoute");
-const detailsRoute = require("./Routes/detailsRoute");
-const searchRoute = require("./Routes/searchRoute");
-const matchRoute = require("./Routes/matchRoute");
-
-app.use("/api", limiter);
-app.use(express.json({ limit: "10kb" }));
+// Routes
+app.use("/api/auth", authRoute);
+app.use("/api/team", teamRoute);
+app.use("/api/league", leagueRoute);
+app.use("/api/match", matchRoute);
+app.use("/api/details", detailsRoute);
+app.use("/api/standing", standingRoute);
+app.use("/api/event", eventRoute);
+app.use("/api/news", newsRoute);
+app.use("/api/sync", syncRoute);
 
 app.get("/", (req, res) => {
-  res.json({ status: "success", message: "Yalla Shoot API is live on Vercel!" });
+  res.json({ status: "API running", time: new Date() });
 });
 
-app.use("/api/auth", authRoute);
-app.use("/api/user", userRoute);
-app.use("/api/league", leagueRoute);
-app.use("/api/team", teamRoute);
-app.use("/api/News", NewsRoute);
-app.use("/api/player", playerRoute);
-app.use("/api/coach", coachRoute);
-app.use("/api/transfer", transferRoute);
-app.use("/api/stadium", stadiumRoute);
-app.use("/api/channel", channelRoute);
-app.use("/api/refree", refereeRoute);
-app.use("/api/referee", refereeRoute);
-app.use("/api/standing", standingRoute);
-app.use("/api/topScores", topScoresRoute);
-app.use("/api/details", detailsRoute);
-app.use("/api/search", searchRoute);
-app.use("/api/match", matchRoute);
-
-app.use((req, res, next) => {
-  next(new appError(`can't find ${req.originalUrl} on the server`, 404));
+app.get("/api", (req, res) => {
+  res.json({ message: "Yalla Shoot API", endpoints: ["/api/match", "/api/league", "/api/team", "/api/sync"] });
 });
 
-app.use(require("./Controller/errorController"));
+app.all("*", (req, res, next) => {
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+});
+
+app.use(globalErrorHandler);
+
+// Auto sync on startup (once)
+try {
+  const { syncAllLeagues } = require("./Services/espnSync");
+  setTimeout(() => {
+    console.log("Starting auto sync...");
+    syncAllLeagues().then(t => console.log(`Auto synced ${t} matches`)).catch(e => console.log("Auto sync failed", e.message));
+  }, 3000);
+} catch (e) {
+  console.log("Auto sync service not found yet", e.message);
+}
 
 module.exports = app;

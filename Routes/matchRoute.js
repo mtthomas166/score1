@@ -4,6 +4,12 @@ const authController = require("../Controller/authController");
 const matchController = require("../Controller/matchController");
 const { validate } = require("../middleware/validate");
 const { matchJoiValidation } = require("../validation/matchValidation");
+
+router.route("/matchesOfLeague/:id").get(matchController.getMatchesInLeague);
+router.route("/matchesOfTeam/:id").get(matchController.getMatchOfTeam);
+router.route("/:id").get(matchController.getOneMatch);
+router.route("/").get(matchController.getAllMatches);
+
 router.use(authController.protect);
 
 router
@@ -12,17 +18,11 @@ router
     validate(matchJoiValidation),
     authController.restrict("admin"),
     matchController.createMatch,
-  )
-  .get(authController.restrict("admin"), matchController.getAllMatches);
+  );
 
 router
   .route("/:id")
-  .get(matchController.getOneMatch)
   .patch(authController.restrict("admin"), matchController.updateMatch)
   .delete(authController.restrict("admin"), matchController.deleteMatch);
-
-router("/matchesOfLeague/:id").get(matchController.getMatchesInLeague);
-
-router("/matchesOfTeam/:id").get(matchController.getMatchOfTeam);
 
 module.exports = router;

@@ -69,7 +69,7 @@ const topScoresRoute = require('./Routes/topScoresRoute');
 const transferRoute = require('./Routes/transferRoute');
 const userRoute = require('./Routes/userRoute');
 
-app.use('/api/auth', authRoute);
+app.use('/api/auth', authRoute); 
 app.use('/api/match', matchRoute);
 app.use('/api/league', leagueRoute);
 app.use('/api/team', teamRoute);

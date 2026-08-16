@@ -9,7 +9,6 @@ const hpp = require("hpp");
 const rateLimiter = require("express-rate-limit");
 const cors = require("cors");
 
-// --- FIX 1: CORS ---
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
@@ -20,6 +19,7 @@ app.use(morgan("dev"));
 app.use(helmet());
 app.use(cookieParser());
 app.use(hpp());
+
 const limiter = rateLimiter({
   max: 100,
   windowMs: 1000 * 60 * 60,
@@ -41,7 +41,7 @@ const standingRoute = require("./Routes/standingRoute");
 const topScoresRoute = require("./Routes/topScoresRoute");
 const detailsRoute = require("./Routes/detailsRoute");
 const searchRoute = require("./Routes/searchRoute");
-const matchRoute = require("./Routes/matchRoute"); // FIX 2: ضيفنا ده
+const matchRoute = require("./Routes/matchRoute");
 
 app.use("/api", limiter);
 app.use(express.json({ limit: "10kb" }));
@@ -61,12 +61,12 @@ app.use("/api/transfer", transferRoute);
 app.use("/api/stadium", stadiumRoute);
 app.use("/api/channel", channelRoute);
 app.use("/api/refree", refereeRoute);
-app.use("/api/referee", refereeRoute); // عشان اللي بيكتبها صح
+app.use("/api/referee", refereeRoute);
 app.use("/api/standing", standingRoute);
 app.use("/api/topScores", topScoresRoute);
 app.use("/api/details", detailsRoute);
 app.use("/api/search", searchRoute);
-app.use("/api/match", matchRoute); // FIX 2: شغلنا الماتشات
+app.use("/api/match", matchRoute);
 
 app.use((req, res, next) => {
   next(new appError(`can't find ${req.originalUrl} on the server`, 404));

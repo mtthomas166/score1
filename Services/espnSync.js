@@ -16,12 +16,30 @@ const LEAGUES_TO_SYNC = [
 async function findOrCreateLeague(fallback) {
   let league = await League.findOne({ name: fallback.name });
   if (!league) {
-    league = await League.create({
-      name: fallback.name,
-      country: fallback.country,
-      logo: "",
-      apiId: Math.floor(Math.random() * 1000000),
-    });
+    try {
+      league = await League.create({
+        name: fallback.name,
+        country: fallback.country,
+        logo: "",
+        apiId: Math.floor(Math.random() * 1000000),
+        startDate: new Date(),
+        endDate: new Date(new Date().setFullYear(new Date().getFullYear()+1)),
+        type: "league",
+        season: new Date().getFullYear(),
+      });
+    } catch (e) {
+      // لو الموديل عنده حقول مختلفة جرب بدون type
+      console.log("League create error:", e.message);
+      league = await League.create({
+        name: fallback.name,
+        country: fallback.country,
+        logo: "",
+        apiId: Math.floor(Math.random() * 1000000),
+        startDate: new Date(),
+        endDate: new Date(new Date().setFullYear(new Date().getFullYear()+1)),
+        type: "League",
+      });
+    }
   }
   return league;
 }

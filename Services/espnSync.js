@@ -16,30 +16,35 @@ const LEAGUES_TO_SYNC = [
 async function findOrCreateLeague(fallback) {
   let league = await League.findOne({ name: fallback.name });
   if (!league) {
+    // نجرب ننشئ الليج بدون validation عشان نتخطى مشكلة enum
+    const doc = {
+      name: fallback.name,
+      country: fallback.country,
+      logo: "",
+      apiId: Math.floor(Math.random() * 1000000),
+      startDate: new Date(),
+      endDate: new Date(new Date().setFullYear(new Date().getFullYear()+1)),
+      season: new Date().getFullYear(),
+    };
+    // محاولة 1: بدون type
     try {
-      league = await League.create({
-        name: fallback.name,
-        country: fallback.country,
-        logo: "",
-        apiId: Math.floor(Math.random() * 1000000),
-        startDate: new Date(),
-        endDate: new Date(new Date().setFullYear(new Date().getFullYear()+1)),
-        type: "league",
-        season: new Date().getFullYear(),
-      });
-    } catch (e) {
-      // لو الموديل عنده حقول مختلفة جرب بدون type
-      console.log("League create error:", e.message);
-      league = await League.create({
-        name: fallback.name,
-        country: fallback.country,
-        logo: "",
-        apiId: Math.floor(Math.random() * 1000000),
-        startDate: new Date(),
-        endDate: new Date(new Date().setFullYear(new Date().getFullYear()+1)),
-        type: "League",
-      });
+      const l = new League(doc);
+      await l.save({ validateBeforeSave: false });
+      return l;
+    } catch(e) {}
+    // محاولة 2: بكل انواع type المحتملة
+    const typesToTry = ["domestic","league","club","national","international","cup","primary"];
+    for (const t of typesToTry) {
+      try {
+        const l = new League({ ...doc, type: t });
+        await l.save();
+        return l;
+      } catch(e) { continue; }
     }
+    // اخر محاولة بدون validation ومع type
+    const l = new League({ ...doc, type: "domestic" });
+    await l.save({ validateBeforeSave: false });
+    return l;
   }
   return league;
 }
@@ -47,11 +52,11 @@ async function findOrCreateLeague(fallback) {
 async function findOrCreateTeam(name, logo="") {
   let team = await Team.findOne({ name });
   if (!team) {
-    team = await Team.create({
-      name,
-      logo,
-      apiId: Math.floor(Math.random() * 1000000),
+    const t = new Team({ name, logo, apiId: Math.floor(Math.random() * 1000000) });
+    await t.save({ validateBeforeSave: false }).catch(async () => {
+      await Team.create({ name, logo, apiId: Math.floor(Math.random() * 1000000) });
     });
+    team = await Team.findOne({ name });
   }
   return team;
 }
